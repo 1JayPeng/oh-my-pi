@@ -32,7 +32,14 @@ describe("E2E: Feishu IM Plugin Integration", () => {
     stateChangeCallback = () => {
       stateChangeCount++;
     };
-    stateSync = new StateSync(1000, stateChangeCallback); // 1 秒同步一次
+    stateSync = new StateSync(1000, stateChangeCallback, async () => ({
+      branch: "main",
+      mainBranch: "main",
+      contextUsage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 1000 },
+      cost: 0,
+      model: "test-model",
+      sessionId: "test-session",
+    }));
     outputFormatter = new OutputFormatter();
     confirmationManager = new ConfirmationManager();
     stateChangeCount = 0;

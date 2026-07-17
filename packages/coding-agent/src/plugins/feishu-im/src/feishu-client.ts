@@ -228,4 +228,25 @@ export class FeishuClient {
       ],
     };
   }
+  /**
+   * 更新卡片（用于流式输出）
+   * 使用 PATCH /im/v1/messages/{message_id} 更新卡片内容
+   */
+  async updateCard(messageId: string, card: FeishuCard): Promise<void> {
+    const response = await this.client.request<{
+      code: number;
+      msg: string;
+    }>({
+      url: `/im/v1/messages/${messageId}`,
+      method: "PATCH",
+      data: {
+        msg_type: "interactive",
+        content: card,
+      },
+    });
+
+    if (response.code !== 0) {
+      throw new Error(`Failed to update card: ${response.msg}`);
+    }
+  }
 }

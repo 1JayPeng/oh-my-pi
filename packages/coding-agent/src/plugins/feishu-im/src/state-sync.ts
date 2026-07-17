@@ -7,16 +7,23 @@ import type { OmpState } from "./types.js";
 
 /**
  * 状态同步器
+ * 定期调用提供的状态查询函数，检测状态变化并通知
  */
 export class StateSync {
   private interval: NodeJS.Timeout | null = null;
   private syncInterval: number; // 毫秒
   private onStateChange: (state: OmpState) => void;
   private lastState: OmpState | null = null;
+  private stateProvider: () => Promise<OmpState>;
 
-  constructor(syncIntervalMs: number, onStateChange: (state: OmpState) => void) {
+  constructor(
+    syncIntervalMs: number,
+    onStateChange: (state: OmpState) => void,
+    stateProvider: () => Promise<OmpState>,
+  ) {
     this.syncInterval = syncIntervalMs;
     this.onStateChange = onStateChange;
+    this.stateProvider = stateProvider;
   }
 
   /**
@@ -49,22 +56,8 @@ export class StateSync {
    */
   private async performSync(): Promise<void> {
     try {
-      // 这里应该调用 OMP 的 get_state API
-      // 暂时使用空实现
-      const state: OmpState = {
-        branch: "unknown",
-        mainBranch: "unknown",
-        contextUsage: {
-          input: 0,
-          output: 0,
-          cacheRead: 0,
-          cacheWrite: 0,
-          total: 0,
-        },
-        cost: 0,
-        model: "unknown",
-        sessionId: "unknown",
-      };
+      // 调用状态提供函数获取当前状态
+      const state = await this.stateProvider();
 
       // 只在状态变化时通知
       if (!this.statesEqual(state, this.lastState)) {

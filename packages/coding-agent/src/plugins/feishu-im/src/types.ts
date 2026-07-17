@@ -22,10 +22,10 @@ export interface FeishuBotConfig {
  * 飞书消息事件
  */
 export interface FeishuMessageEvent {
-  /** 消息类型 */
-  type: "im.message.receive_v1" | "p2im.message.receive_v1";
   /** 消息 ID */
   message_id: string;
+  /** 消息类型 */
+  type: "im.message.receive_v1" | "p2im.message.receive_v1";
   /** 会话类型 */
   chat_type: "p2p" | "group";
   /** 发送者 ID */
