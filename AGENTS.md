@@ -1,4 +1,12 @@
 # Development Rules
+## 回复语言
+
+**你必须在所有对话回复中使用简体中文。** 包括：
+- 代码注释、错误信息、日志输出
+- 技术说明、决策理由、风险评估
+- 与用户的日常沟通
+
+**例外：** 代码中的标识符、变量名、函数名保持英文。commit message 遵循 Conventional Commits 格式（英文）。
 
 ## Default Context
 
