@@ -1,0 +1,22 @@
+# 敏感信息 - 不要提交
+.env
+.env.local
+*.secret
+!*.example
+
+# 构建输出
+dist/
+build/
+
+# 依赖
+node_modules/
+
+# 日志
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.swp
+*.swo
+*~

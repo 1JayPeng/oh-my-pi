@@ -1,0 +1,23 @@
+{
+  "name": "@oh-my-pi/plugin-feishu-omp",
+  "version": "1.0.0",
+  "description": "OMP Feishu integration plugin using lark-cli",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "dev": "bun run --watch src/index.ts"
+  },
+  "dependencies": {
+    "@oh-my-pi/pi-utils": "workspace:*"
+  },
+  "devDependencies": {
+    "@oh-my-pi/pi-ai": "workspace:*",
+    "@oh-my-pi/pi-catalog": "workspace:*",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@oh-my-pi/coding-agent": "workspace:*"
+  }
+}
