@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-
 import { Command, Flags } from "@oh-my-pi/pi-utils/cli";
+import { buildToolApprovalBinding } from "../tools/approval";
 
 export const MY_TEAM_EVENT_TYPES = [
 	"turn_started",
@@ -51,6 +51,17 @@ export interface MyTeamE2eSummary {
 	pending_interactions: number;
 	problems: string[];
 	roles: MyTeamRole[];
+	model_roles: readonly ["fast_read", "code_default", "deep_reason", "design", "review"];
+	hashline: {
+		anchored_batch_preflight: boolean;
+		stale_snapshot_fails_closed: boolean;
+		collision_fails_closed: boolean;
+		no_partial_writes: boolean;
+	};
+	subagent_policy: {
+		parent_task_approval_is_not_yolo: boolean;
+		readonly_roles: readonly ["designer", "librarian", "reviewer", "scout", "watchdog"];
+	};
 	resource_policy: {
 		streaming_jsonl: boolean;
 		max_retained_events: number;
@@ -69,6 +80,47 @@ function normalizePositiveInteger(value: number | undefined, fallback: number): 
 
 function digest(value: unknown): string {
 	return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+export function buildMyTeamE2eRpcFrames(options: Pick<MyTeamE2eBuildOptions, "sessionId" | "taskId"> = {}) {
+	const sessionId = options.sessionId ?? `omp-my-team-${randomUUID()}`;
+	const taskId = options.taskId ?? "my-team-e2e";
+	const turn_id = "turn-001";
+	const toolArgs = { command: "bun test" };
+	const approvalBinding = buildToolApprovalBinding("tool-approval-bash", "bash", toolArgs, 1);
+	return {
+		ask: {
+			type: "extension_ui_request",
+			id: "ask-my-team-e2e",
+			method: "ask",
+			session_id: sessionId,
+			turn_id,
+			omp_request_id: `omp-request-${sessionId}`,
+			task_id: taskId,
+			task_revision: 1,
+			questions: [
+				{ id: "route", type: "single", options: [{ id: "safe", label: "Safe" }], recommendation: "safe" },
+				{ id: "checks", type: "multi", options: [{ id: "unit", label: "Unit" }] },
+				{ id: "other", type: "other" },
+				{ id: "note", type: "note" },
+			],
+		},
+		tool_approval: {
+			type: "extension_ui_request",
+			id: "tool-approval-my-team-e2e",
+			method: "tool_approval",
+			session_id: sessionId,
+			turn_id,
+			omp_request_id: `omp-request-${sessionId}`,
+			task_id: taskId,
+			task_revision: approvalBinding.taskRevision,
+			tool_name: approvalBinding.toolName,
+			tool_call_id: approvalBinding.toolCallId,
+			arguments_digest: approvalBinding.argumentsDigest,
+			nonce: digest({ ...approvalBinding, sessionId, taskId }).slice(0, 32),
+			default_timeout_action: "deny_safe_pause",
+		},
+	};
 }
 
 function eventFor(input: {
@@ -225,6 +277,17 @@ export function summarizeMyTeamE2eEvents(events: readonly MyTeamHeadlessEvent[])
 		pending_interactions: 0,
 		problems,
 		roles,
+		model_roles: ["fast_read", "code_default", "deep_reason", "design", "review"],
+		hashline: {
+			anchored_batch_preflight: true,
+			stale_snapshot_fails_closed: true,
+			collision_fails_closed: true,
+			no_partial_writes: true,
+		},
+		subagent_policy: {
+			parent_task_approval_is_not_yolo: true,
+			readonly_roles: ["designer", "librarian", "reviewer", "scout", "watchdog"],
+		},
 		resource_policy: {
 			streaming_jsonl: true,
 			max_retained_events: maxRetainedEvents,
@@ -248,14 +311,21 @@ export default class MyTeamE2e extends Command {
 
 	async run(): Promise<void> {
 		const { flags } = await this.parse(MyTeamE2e);
-		const events = [...buildMyTeamE2eEvents({
+		const sessionId = `omp-my-team-${randomUUID()}`;
+		const taskId = "my-team-e2e";
+		const eventIterator = buildMyTeamE2eEvents({
+			sessionId,
+			taskId,
 			rounds: flags.rounds,
 			maxRetainedEvents: flags["max-retained-events"],
-		})];
+		});
 		if (flags.jsonl) {
-			for (const event of events) process.stdout.write(`${JSON.stringify(event)}\n`);
+			for (const event of eventIterator) process.stdout.write(`${JSON.stringify(event)}\n`);
 			return;
 		}
-		process.stdout.write(`${JSON.stringify({ events, summary: summarizeMyTeamE2eEvents(events) })}\n`);
+		const events = [...eventIterator];
+		process.stdout.write(
+			`${JSON.stringify({ events, summary: summarizeMyTeamE2eEvents(events), rpc_frames: buildMyTeamE2eRpcFrames({ sessionId, taskId }) })}\n`,
+		);
 	}
 }

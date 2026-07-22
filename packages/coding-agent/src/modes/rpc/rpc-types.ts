@@ -8,7 +8,7 @@ import type { AgentMessage, AgentToolResult, ThinkingLevel, ToolLoadMode } from 
 import type { CompactionResult } from "@oh-my-pi/pi-agent-core/compaction";
 import type { Effort, ImageContent, Model, ToolExample } from "@oh-my-pi/pi-ai";
 import type { BashResult } from "../../exec/bash-executor";
-import type { ContextUsage } from "../../extensibility/extensions/types";
+import type { ContextUsage, ExtensionAskDialogQuestion, ExtensionAskDialogResult, ExtensionToolApprovalRequest } from "../../extensibility/extensions/types";
 import type { AgentSessionEvent, SessionStats } from "../../session/agent-session";
 import type { FileEntry } from "../../session/session-entries";
 import type { AvailableSlashCommandSource } from "../../slash-commands/available-commands";
@@ -328,6 +328,8 @@ export type RpcSessionEventFrame = AgentSessionEvent | RpcSubagentFrame;
 /** Emitted when an extension needs user input */
 export type RpcExtensionUIRequest =
 	| { type: "extension_ui_request"; id: string; method: "select"; title: string; options: string[]; timeout?: number }
+	| { type: "extension_ui_request"; id: string; method: "ask"; questions: ExtensionAskDialogQuestion[]; timeout?: number; session_id?: string; turn_id?: string; omp_request_id?: string; task_id?: string; task_revision?: number }
+	| ({ type: "extension_ui_request"; id: string; method: "tool_approval" } & ExtensionToolApprovalRequest)
 	| { type: "extension_ui_request"; id: string; method: "confirm"; title: string; message: string; timeout?: number }
 	| {
 			type: "extension_ui_request";
@@ -492,6 +494,8 @@ export interface RpcHostUriResult {
 export type RpcExtensionUIResponse =
 	| { type: "extension_ui_response"; id: string; value: string }
 	| { type: "extension_ui_response"; id: string; confirmed: boolean }
+	| { type: "extension_ui_response"; id: string; askResult: ExtensionAskDialogResult | undefined }
+	| { type: "extension_ui_response"; id: string; approved: boolean; reason?: string }
 	| { type: "extension_ui_response"; id: string; cancelled: true; timedOut?: boolean };
 
 // ============================================================================

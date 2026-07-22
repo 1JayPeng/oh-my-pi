@@ -772,6 +772,8 @@ describe("Warp CLI-agent events", () => {
 			sessionId: "session-123",
 			toolCallId: "tool-call-123",
 			toolName: "bash",
+			argumentsDigest: "digest-123",
+			taskRevision: 7,
 			approvalMode: "always-ask",
 		});
 
@@ -782,6 +784,9 @@ describe("Warp CLI-agent events", () => {
 		expect(body).toEqual({
 			event: "permission_request",
 			tool_name: "bash",
+			tool_call_id: "tool-call-123",
+			arguments_digest: "digest-123",
+			task_revision: 7,
 			summary: "omp wants to run bash",
 			v: 1,
 			agent: "omp",

@@ -10,11 +10,11 @@ import { collectConfigCandidates } from "./watchdog";
 /**
  * One advisor declared in a `WATCHDOG.yml` file. `model` is a model selector
  * with an optional `:level` thinking suffix (e.g. `x-ai/grok-code-fast:high`),
- * resolved exactly like any other model override; `tools` is a subset of
- * `BUILTIN_TOOL_NAMES` — any built-in name, including mutating tools such as
- * `edit`/`write`/`bash` (the advisor is a full agent). Omitted falls back to
- * the default `read`/`grep`/`glob` subset; an explicit empty list grants no
- * tools. `instructions` is the advisor's specialization, appended to the shared
+ * resolved exactly like any other model override; `tools` is restricted to
+ * readonly built-ins (`read`/`grep`/`glob`/`lsp`/`web_search`/`ast_grep`/
+ * `inspect_image`). Omitted falls back to the default `read`/`grep`/`glob`
+ * subset; an explicit empty list grants no tools. `instructions` is the
+ * advisor's specialization, appended to the shared
  * baseline.
  */
 export interface AdvisorConfig {
@@ -106,21 +106,29 @@ export function getOrCreateAdvisorProviderSessionId(
 
 /** Built tool names, for validating an advisor's `tools` list. */
 const KNOWN_TOOL_NAMES = new Set<string>(BUILTIN_TOOL_NAMES);
+const READONLY_ADVISOR_TOOL_NAMES = new Set<string>([
+	"read",
+	"grep",
+	"glob",
+	"lsp",
+	"web_search",
+	"ast_grep",
+	"inspect_image",
+]);
 
 /**
- * Keep only valid tool names from an advisor's `tools` list, dropping unknowns
- * with a warning. The advisor is a full agent, so any built tool may be granted;
- * the runtime further filters to what's actually available this session.
- * `undefined` means "use the default subset" (read/grep/glob); only an explicit
- * raw empty list means "no tools".
+ * Keep only readonly tool names from an advisor's `tools` list, dropping
+ * unknown or mutating tools with a warning. The runtime further filters to
+ * what's actually available this session. `undefined` means "use the default
+ * subset" (read/grep/glob); only an explicit raw empty list means "no tools".
  */
 function filterAdvisorTools(tools: string[] | undefined, sourcePath: string): string[] | undefined {
 	if (tools === undefined) return undefined;
 	if (tools.length === 0) return [];
 	// Normalize legacy aliases (search→grep, find→glob) and dedupe before validating.
 	const filtered = normalizeToolNames(tools).filter(name => {
-		if (KNOWN_TOOL_NAMES.has(name)) return true;
-		logger.warn("Advisor config: dropping unknown tool", { path: sourcePath, tool: name });
+		if (KNOWN_TOOL_NAMES.has(name) && READONLY_ADVISOR_TOOL_NAMES.has(name)) return true;
+		logger.warn("Advisor config: dropping unavailable readonly tool", { path: sourcePath, tool: name });
 		return false;
 	});
 	return filtered.length > 0 ? filtered : undefined;

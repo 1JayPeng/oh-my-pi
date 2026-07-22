@@ -8,6 +8,7 @@ declare module "@oh-my-pi/pi-agent-core" {
 		hasUI?: boolean;
 		toolNames?: string[];
 		toolCall?: ToolCallContext;
+		taskRevision?: number;
 		/** Set on `xd://` device dispatches: the write tool's outer approval gate
 		 *  already resolved this call at the mounted tool's tier, so the inner
 		 *  wrapper must not re-prompt for the same action (explicit per-tool

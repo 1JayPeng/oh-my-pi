@@ -2342,6 +2342,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			settings,
 			localProtocolOptions,
 			autoApprove: options.autoApprove ?? false,
+			taskRevision: Math.max(sessionManager.getEntries().length, 1),
 		});
 		const toolContextStore = new ToolContextStore(getSessionContext);
 
@@ -2445,7 +2446,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			cwd,
 			tools: toolRegistry,
 			getTool: resolveCursorDevice,
-			getToolContext: () => toolContextStore.getContext(),
+			getToolContext: toolCall => toolContextStore.getContext(toolCall),
 			emitEvent: event => cursorEventEmitter?.(event),
 		});
 

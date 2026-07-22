@@ -8,6 +8,7 @@ import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
 import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+import { buildToolApprovalBinding } from "@oh-my-pi/pi-coding-agent/tools/approval";
 import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
 
 const BASE_SETTINGS = {
@@ -87,6 +88,10 @@ describe("tools.approvalMode setting", () => {
 		return bash;
 	}
 
+	function approvalContext(settings: Settings, extra: Partial<AgentToolContext> = {}): AgentToolContext {
+		return { settings, taskRevision: 1, ...extra } as AgentToolContext;
+	}
+
 	it("yolo mode (default) bypasses approval for non-overriding tool calls", async () => {
 		const settings = approvalSettings();
 		const result = await bashTool().execute("yolo", { command: "echo ok" }, undefined, undefined, {
@@ -98,7 +103,11 @@ describe("tools.approvalMode setting", () => {
 	it("always-ask mode rejects exec tools when no UI is available", async () => {
 		const settings = approvalSettings({ "tools.approvalMode": "always-ask" });
 		await expect(
-			bashTool().execute("always-ask", { command: "echo blocked" }, undefined, undefined, {
+			bashTool().execute("always-ask", { command: "echo blocked" }, undefined, undefined, approvalContext(settings)),
+		).rejects.toThrow(/requires approval but no interactive UI available/);
+
+		await expect(
+			bashTool().execute("always-ask-no-revision", { command: "echo blocked" }, undefined, undefined, {
 				settings,
 			} as AgentToolContext),
 		).rejects.toThrow(/requires approval but no interactive UI available/);
@@ -121,9 +130,13 @@ describe("tools.approvalMode setting", () => {
 			"tools.approval": { bash: "prompt" },
 		});
 		await expect(
-			bashTool().execute("yolo-prompt", { command: "echo blocked" }, undefined, undefined, {
-				settings,
-			} as AgentToolContext),
+			bashTool().execute(
+				"yolo-prompt",
+				{ command: "echo blocked" },
+				undefined,
+				undefined,
+				approvalContext(settings),
+			),
 		).rejects.toThrow(/requires approval but no interactive UI available/);
 	});
 
@@ -133,9 +146,13 @@ describe("tools.approvalMode setting", () => {
 			"tools.approval": {},
 		});
 		await expect(
-			bashTool().execute("write-mode", { command: "echo unconfigured" }, undefined, undefined, {
-				settings,
-			} as AgentToolContext),
+			bashTool().execute(
+				"write-mode",
+				{ command: "echo unconfigured" },
+				undefined,
+				undefined,
+				approvalContext(settings),
+			),
 		).rejects.toThrow(/requires approval but no interactive UI available/);
 	});
 
@@ -197,10 +214,13 @@ describe("tools.approvalMode setting", () => {
 			"tools.approval": { bash: "prompt" },
 		});
 		await expect(
-			bashTool().execute("xdev-explicit-prompt", { command: "echo blocked" }, undefined, undefined, {
-				settings: promptSettings,
-				xdevApproved: true,
-			} as AgentToolContext),
+			bashTool().execute(
+				"xdev-explicit-prompt",
+				{ command: "echo blocked" },
+				undefined,
+				undefined,
+				approvalContext(promptSettings, { xdevApproved: true }),
+			),
 		).rejects.toThrow(/requires approval but no interactive UI available/);
 
 		const denySettings = approvalSettings({
@@ -224,5 +244,21 @@ describe("tools.approvalMode setting", () => {
 		// fix is to construct the runner unconditionally; this test makes that contract explicit so
 		// a future change to make the runner optional again cannot silently re-open the hole.
 		expect(session.extensionRunner).toBeDefined();
+	});
+
+	it("binds tool approvals to argument digest and task revision", () => {
+		const binding = buildToolApprovalBinding("call-1", "bash", { command: "echo ok" }, 7);
+
+		expect(binding).toMatchObject({ toolCallId: "call-1", toolName: "bash", taskRevision: 7 });
+		expect(binding.argumentsDigest).toMatch(/^[a-f0-9]{64}$/);
+		expect(buildToolApprovalBinding("call-1", "bash", { command: "echo ok" }, 7).argumentsDigest).toBe(
+			binding.argumentsDigest,
+		);
+		expect(buildToolApprovalBinding("call-1", "bash", { command: "echo nope" }, 7).argumentsDigest).not.toBe(
+			binding.argumentsDigest,
+		);
+		expect(() => buildToolApprovalBinding("call-1", "bash", { command: "echo ok" }, 0)).toThrow(
+			/positive task revision/,
+		);
 	});
 });

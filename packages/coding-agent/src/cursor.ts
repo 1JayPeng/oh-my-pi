@@ -6,6 +6,7 @@ import type {
 	AgentToolContext,
 	AgentToolResult,
 	AgentToolUpdateCallback,
+	ToolCallContext,
 } from "@oh-my-pi/pi-agent-core";
 import type {
 	CursorMcpCall,
@@ -16,12 +17,15 @@ import type {
 import { sanitizeText } from "@oh-my-pi/pi-utils";
 import { resolveToCwd } from "./tools/path-utils";
 
+function singleToolCallContext(toolCallId: string, toolName: string): ToolCallContext {
+	return { batchId: toolCallId, index: 0, total: 1, toolCalls: [{ id: toolCallId, name: toolName }] };
+}
 interface CursorExecBridgeOptions {
 	cwd: string;
 	getCwd?: () => string;
 	tools: Map<string, AgentTool>;
 	getTool?: (name: string) => AgentTool | undefined;
-	getToolContext?: () => AgentToolContext | undefined;
+	getToolContext?: (toolCall: ToolCallContext) => AgentToolContext | undefined;
 	emitEvent?: (event: AgentEvent) => void;
 	/**
 	 * Whether the Cursor native `delete` frame may remove files. Unlike every
@@ -97,7 +101,7 @@ async function executeTool(
 			args as Record<string, unknown>,
 			undefined,
 			onUpdate,
-			options.getToolContext?.(),
+			options.getToolContext?.(singleToolCallContext(toolCallId, toolName)),
 		);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -295,7 +299,13 @@ export class CursorExecHandlers implements ICursorExecHandlers {
 		};
 
 		try {
-			result = await tool.execute(toolCallId, toolArgs, undefined, onUpdate, this.options.getToolContext?.());
+			result = await tool.execute(
+				toolCallId,
+				toolArgs,
+				undefined,
+				onUpdate,
+				this.options.getToolContext?.(singleToolCallContext(toolCallId, toolName)),
+			);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			result = buildToolErrorResult(message);

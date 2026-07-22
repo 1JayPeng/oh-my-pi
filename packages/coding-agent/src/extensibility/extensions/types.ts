@@ -155,6 +155,21 @@ export interface ExtensionAskDialogChatResult {
 
 export type ExtensionAskDialogResult = ExtensionAskDialogSubmitResult | ExtensionAskDialogChatResult;
 
+export interface ExtensionToolApprovalRequest {
+	title: string;
+	toolName: string;
+	toolCallId: string;
+	argumentsDigest: string;
+	taskRevision: number;
+	reason?: string;
+	defaultTimeoutAction?: "deny_safe_pause";
+}
+
+export interface ExtensionToolApprovalResult {
+	approved: boolean;
+	reason?: string;
+}
+
 export function getExtensionUISelectOptionLabel(option: ExtensionUISelectItem): string {
 	return typeof option === "string" ? option : option.label;
 }
@@ -242,6 +257,9 @@ export interface ExtensionUIContext {
 		questions: ExtensionAskDialogQuestion[],
 		dialogOptions?: ExtensionUIDialogOptions,
 	): Promise<ExtensionAskDialogResult | undefined>;
+
+	/** Request structured tool approval with digest/revision binding. */
+	toolApproval?(request: ExtensionToolApprovalRequest, dialogOptions?: ExtensionUIDialogOptions): Promise<ExtensionToolApprovalResult>;
 
 	/** Show a notification to the user. */
 	notify(message: string, type?: "info" | "warning" | "error"): void;
@@ -758,6 +776,8 @@ export interface ToolApprovalRequestedEvent {
 	sessionId: string;
 	toolCallId: string;
 	toolName: string;
+	argumentsDigest: string;
+	taskRevision: number;
 	reason?: string;
 	approvalMode: ApprovalMode;
 }
@@ -767,6 +787,8 @@ export interface ToolApprovalResolvedEvent {
 	sessionId: string;
 	toolCallId: string;
 	toolName: string;
+	argumentsDigest: string;
+	taskRevision: number;
 	approved: boolean;
 	reason?: string;
 }

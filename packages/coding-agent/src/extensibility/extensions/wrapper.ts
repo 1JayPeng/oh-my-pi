@@ -11,7 +11,12 @@ import type {
 import type { ImageContent, Static, TextContent, TSchema } from "@oh-my-pi/pi-ai";
 import type { Settings } from "../../config/settings";
 import type { Theme } from "../../modes/theme/theme";
-import { type ApprovalMode, formatApprovalPrompt, resolveApproval } from "../../tools/approval";
+import {
+	type ApprovalMode,
+	buildToolApprovalBinding,
+	formatApprovalPrompt,
+	resolveApproval,
+} from "../../tools/approval";
 import { defaultLoadModeForToolName } from "../../tools/essential-tools";
 import { normalizeToolEventInput, resolveToolEventInput } from "../tool-event-input";
 import { applyToolProxy } from "../tool-proxy";
@@ -148,12 +153,27 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 			const hasApprovalHandlers =
 				this.runner.hasHandlers("tool_approval_requested") || this.runner.hasHandlers("tool_approval_resolved");
 			const sessionId = context?.sessionManager?.getSessionId() ?? "";
-			if (hasApprovalHandlers) {
+			const taskRevision =
+				Number.isInteger(context?.taskRevision) && Number(context?.taskRevision) > 0
+					? Number(context?.taskRevision)
+					: context?.sessionManager
+						? Math.max(context.sessionManager.getEntries().length, 1)
+						: undefined;
+			if (hasApprovalHandlers && taskRevision === undefined) {
+				throw new Error(`Tool "${this.tool.name}" requires approval but task revision is unavailable.`);
+			}
+			const approvalBinding =
+				taskRevision === undefined
+					? undefined
+					: buildToolApprovalBinding(toolCallId, this.tool.name, params, taskRevision);
+			if (hasApprovalHandlers && approvalBinding) {
 				await this.runner.emit({
 					type: "tool_approval_requested",
 					sessionId,
 					toolName: this.tool.name,
 					toolCallId,
+					argumentsDigest: approvalBinding.argumentsDigest,
+					taskRevision: approvalBinding.taskRevision,
 					...(approvalCheck.reason ? { reason: approvalCheck.reason } : {}),
 					approvalMode,
 				});
@@ -166,6 +186,8 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 					sessionId,
 					toolName: this.tool.name,
 					toolCallId,
+					argumentsDigest: approvalBinding!.argumentsDigest,
+					taskRevision: approvalBinding!.taskRevision,
 					approved,
 					...(reason ? { reason } : {}),
 				});
@@ -185,18 +207,31 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 			}
 
 			const uiContext = this.runner.getUIContext();
-			let choice: string | undefined;
+			const title = formatApprovalPrompt(this.tool, params, approvalCheck.reason);
+			let approved = false;
+			let denialReason = "denied by user";
 			try {
-				choice = await uiContext.select(formatApprovalPrompt(this.tool, params, approvalCheck.reason), [
-					"Approve",
-					"Deny",
-				]);
+				if (uiContext.toolApproval && approvalBinding) {
+					const decision = await uiContext.toolApproval({
+						title,
+						toolName: this.tool.name,
+						toolCallId,
+						argumentsDigest: approvalBinding.argumentsDigest,
+						taskRevision: approvalBinding.taskRevision,
+						...(approvalCheck.reason ? { reason: approvalCheck.reason } : {}),
+						defaultTimeoutAction: "deny_safe_pause",
+					});
+					approved = decision.approved;
+					denialReason = decision.reason ?? denialReason;
+				} else {
+					const choice = await uiContext.select(title, ["Approve", "Deny"]);
+					approved = choice === "Approve";
+				}
 			} catch (err) {
 				await resolveApproval(false, err instanceof Error ? err.message : "approval aborted");
 				throw err;
 			}
-			const approved = choice === "Approve";
-			await resolveApproval(approved, approved ? undefined : "denied by user");
+			await resolveApproval(approved, approved ? undefined : denialReason);
 			if (!approved) {
 				throw new Error(`Tool call denied by user: ${this.tool.name}`);
 			}

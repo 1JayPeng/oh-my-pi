@@ -1571,6 +1571,7 @@ describe("ExtensionRunner", () => {
 			await expect(
 				(wrapper as ExtensionToolWrapper<any>).execute("call-partial-context", {}, undefined, undefined, {
 					settings: { get: (key: string) => (key === "tools.approvalMode" ? "always-ask" : {}) },
+					taskRevision: 1,
 				} as never),
 			).rejects.toThrow('Tool "dangerous_tool" requires approval but no interactive UI available.');
 

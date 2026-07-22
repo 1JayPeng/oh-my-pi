@@ -6,6 +6,7 @@
  * - compare a tool capability tier against the active approval mode,
  * - format the generic approval prompt body.
  */
+import { createHash } from "node:crypto";
 import type { AgentTool, ToolApprovalDecision, ToolTier } from "@oh-my-pi/pi-agent-core";
 
 export type { ToolApproval, ToolApprovalDecision, ToolTier } from "@oh-my-pi/pi-agent-core";
@@ -20,6 +21,30 @@ export interface ResolvedApproval {
 	tier: ToolTier;
 	reason?: string;
 	override: boolean;
+}
+
+export interface ToolApprovalBinding {
+	toolCallId: string;
+	toolName: string;
+	argumentsDigest: string;
+	taskRevision: number;
+}
+
+export function buildToolApprovalBinding(
+	toolCallId: string,
+	toolName: string,
+	args: unknown,
+	taskRevision: number,
+): ToolApprovalBinding {
+	if (!Number.isInteger(taskRevision) || taskRevision <= 0) {
+		throw new Error("Tool approval requires a positive task revision.");
+	}
+	return {
+		toolCallId,
+		toolName,
+		argumentsDigest: createHash("sha256").update(JSON.stringify({ toolName, args })).digest("hex"),
+		taskRevision,
+	};
 }
 
 const POLICY_VALUES: ReadonlySet<ApprovalPolicy> = new Set(["allow", "deny", "prompt"]);

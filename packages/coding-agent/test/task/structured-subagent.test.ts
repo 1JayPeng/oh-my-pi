@@ -159,6 +159,14 @@ describe("structured subagent primitive", () => {
 		expect(discover).not.toHaveBeenCalled();
 	});
 
+	it("keeps headless subagents on always-ask instead of parent task yolo", () => {
+		const settings = executorModule.createSubagentSettings(Settings.isolated({}), {
+			"tools.approvalMode": "yolo",
+		});
+
+		expect(settings.get("tools.approvalMode")).toBe("always-ask");
+	});
+
 	it("leases temporary artifacts for a retained invocation and registers them for agent URLs", async () => {
 		mockDiscovery();
 		let artifactsDir: string | undefined;

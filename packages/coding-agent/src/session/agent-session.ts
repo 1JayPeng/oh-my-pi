@@ -7426,9 +7426,11 @@ export class AgentSession {
 			return tool ? [tool] : [];
 		});
 		const previousActiveToolNames = this.getActiveToolNames();
+		const previousAgentTools = this.agent.state.tools;
+		this.agent.setTools(tools);
+		this.#setActiveToolNames?.(validToolNames);
 		this.#mountedXdevToolNames = new Set(mountedTools.map(tool => tool.name));
 		this.#xdevRegistry?.reconcile(mountedTools);
-		this.#setActiveToolNames?.(validToolNames);
 
 		let rebuiltSystemPrompt: string[] | undefined;
 		let rebuiltSignature: string | undefined;
@@ -7445,11 +7447,11 @@ export class AgentSession {
 			this.#mountedXdevToolNames = previousMounted;
 			this.#xdevRegistry?.reconcile(previousMountedTools);
 			this.#setActiveToolNames?.(previousActiveToolNames);
+			this.agent.setTools(previousAgentTools);
 			throw error;
 		}
 
 		this.#notifyXdevMountDelta(previousMounted);
-		this.agent.setTools(tools);
 		if (rebuiltSystemPrompt && rebuiltSignature) {
 			if (this.#lastAppliedToolSignature !== undefined) this.#clearInheritedProviderPromptCacheKey();
 			this.#baseSystemPrompt = rebuiltSystemPrompt;

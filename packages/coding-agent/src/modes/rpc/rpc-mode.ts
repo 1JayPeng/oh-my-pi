@@ -17,8 +17,12 @@ import { reset as resetCapabilities } from "../../capability";
 import { clearPluginRootsAndCaches, resolveActiveProjectRegistryPath } from "../../discovery/helpers";
 import {
 	type ExtensionUIContext,
+	type ExtensionAskDialogQuestion,
+	type ExtensionAskDialogResult,
 	type ExtensionUIDialogOptions,
 	type ExtensionUISelectItem,
+	type ExtensionToolApprovalRequest,
+	type ExtensionToolApprovalResult,
 	type ExtensionWidgetOptions,
 	getExtensionUISelectOptionLabel,
 } from "../../extensibility/extensions";
@@ -747,6 +751,44 @@ export async function runRpcMode(
 				undefined,
 				{ method: "input", title, placeholder, timeout: dialogOptions?.timeout },
 				response => parseValueDialogResponse(response, dialogOptions),
+			);
+		}
+
+		askDialog(
+			questions: ExtensionAskDialogQuestion[],
+			dialogOptions?: ExtensionUIDialogOptions,
+		): Promise<ExtensionAskDialogResult | undefined> {
+			return this.#createDialogPromise(
+				dialogOptions,
+				undefined,
+				{ method: "ask", questions, timeout: dialogOptions?.timeout },
+				response => {
+					if ("cancelled" in response && response.cancelled) {
+						if (response.timedOut) dialogOptions?.onTimeout?.();
+						return undefined;
+					}
+					if ("askResult" in response) return response.askResult;
+					return undefined;
+				},
+			);
+		}
+
+		toolApproval(
+			request: ExtensionToolApprovalRequest,
+			dialogOptions?: ExtensionUIDialogOptions,
+		): Promise<ExtensionToolApprovalResult> {
+			return this.#createDialogPromise(
+				dialogOptions,
+				{ approved: false, reason: "approval timed out" },
+				{ method: "tool_approval", ...request, timeout: dialogOptions?.timeout },
+				response => {
+					if ("cancelled" in response && response.cancelled) {
+						if (response.timedOut) dialogOptions?.onTimeout?.();
+						return { approved: false, reason: response.timedOut ? "approval timed out" : "approval cancelled" };
+					}
+					if ("approved" in response) return { approved: response.approved, reason: response.reason };
+					return { approved: false, reason: "invalid approval response" };
+				},
 			);
 		}
 

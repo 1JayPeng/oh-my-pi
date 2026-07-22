@@ -198,6 +198,9 @@ export function createWarpEventBridgeExtension(): ExtensionFactory {
 			emitter?.emit({
 				event: "permission_request",
 				tool_name: event.toolName,
+				tool_call_id: event.toolCallId,
+				arguments_digest: event.argumentsDigest,
+				task_revision: event.taskRevision,
 				summary: `omp wants to run ${event.toolName}`,
 			});
 		});
